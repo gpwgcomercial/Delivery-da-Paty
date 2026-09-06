@@ -7,22 +7,41 @@ import { createClient } from '@/lib/supabase/server';
 export async function login(formData: FormData) {
   const supabase = await createClient();
 
-  const email = String(formData.get('email'));
-  const password = String(formData.get('password'));
+  const email = String(formData.get('email') ?? '').trim();
+  const password = String(formData.get('password') ?? '');
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error || !data.user) {
     redirect(`/login?erro=${encodeURIComponent(error?.message ?? 'Não foi possível entrar')}`);
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('user_type')
-    .eq('id', data.user!.id)
+    .eq('id', data.user.id)
     .maybeSingle();
 
+  if (profileError) {
+    redirect(`/login?erro=${encodeURIComponent('Não foi possível carregar o perfil da conta')}`);
+  }
+
+  if (profile?.user_type === 'admin') {
+    const { data: adminProfile, error: adminError } = await supabase
+      .from('admin_profiles')
+      .select('role')
+      .eq('user_id', data.user.id)
+      .maybeSingle();
+
+    if (adminError || !adminProfile) {
+      redirect(`/login?erro=${encodeURIComponent('Esta conta ainda não está configurada como administrador')}`);
+    }
+
+    revalidatePath('/', 'layout');
+    redirect('/admin');
+  }
+
   revalidatePath('/', 'layout');
-  redirect(profile?.user_type === 'admin' ? '/admin' : '/');
+  redirect('/');
 }
 
 export async function logout() {
@@ -37,7 +56,6 @@ export async function requestPasswordReset(formData: FormData) {
   const email = String(formData.get('email'));
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
 
-  // Não revelamos se o e-mail existe ou não — mensagem genérica sempre.
   await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${origin}/auth/callback?next=/recuperar-senha/nova-senha`,
   });
