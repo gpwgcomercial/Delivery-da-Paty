@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 
+const SITE_URL = 'https://delivery-da-paty-nkrq.vercel.app';
+
 export async function login(formData: FormData) {
   const supabase = await createClient();
 
@@ -53,12 +55,15 @@ export async function logout() {
 
 export async function requestPasswordReset(formData: FormData) {
   const supabase = await createClient();
-  const email = String(formData.get('email'));
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+  const email = String(formData.get('email') ?? '').trim();
 
-  await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/callback?next=/recuperar-senha/nova-senha`,
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${SITE_URL}/auth/callback?next=/recuperar-senha/nova-senha`,
   });
+
+  if (error) {
+    redirect(`/recuperar-senha?erro=${encodeURIComponent(error.message)}`);
+  }
 
   redirect('/recuperar-senha?enviado=1');
 }
@@ -77,7 +82,6 @@ export async function updatePassword(formData: FormData) {
 
 export async function signUpClient(formData: FormData) {
   const supabase = await createClient();
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
 
   const email = String(formData.get('email'));
   const password = String(formData.get('password'));
@@ -89,7 +93,7 @@ export async function signUpClient(formData: FormData) {
     password,
     options: {
       data: { user_type: 'client' },
-      emailRedirectTo: `${origin}/auth/callback`,
+      emailRedirectTo: `${SITE_URL}/auth/callback`,
     },
   });
   if (signUpError || !signUpData.user) {
@@ -127,7 +131,6 @@ export async function signUpClient(formData: FormData) {
 
 export async function signUpStore(formData: FormData) {
   const supabase = await createClient();
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
 
   const email = String(formData.get('email'));
   const password = String(formData.get('password'));
@@ -138,7 +141,7 @@ export async function signUpStore(formData: FormData) {
     password,
     options: {
       data: { user_type: 'store' },
-      emailRedirectTo: `${origin}/auth/callback`,
+      emailRedirectTo: `${SITE_URL}/auth/callback`,
     },
   });
   if (signUpError || !signUpData.user) {
